@@ -3,6 +3,8 @@ package com.mapbox.mapboxsdk.overlay;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -22,8 +24,6 @@ import com.mapbox.mapboxsdk.overlay.Overlay.Snappable;
 import com.mapbox.mapboxsdk.util.constants.UtilConstants;
 import com.mapbox.mapboxsdk.views.MapController;
 import com.mapbox.mapboxsdk.views.MapView;
-import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
-import com.mapbox.mapboxsdk.views.safecanvas.SafePaint;
 import com.mapbox.mapboxsdk.views.util.Projection;
 import java.util.LinkedList;
 
@@ -31,14 +31,14 @@ import java.util.LinkedList;
  * @author Marc Kurtz
  * @author Manuel Stahl
  */
-public class UserLocationOverlay extends SafeDrawOverlay implements Snappable, MapListener {
+public class UserLocationOverlay extends Overlay implements Snappable, MapListener {
 
     public enum TrackingMode {
         NONE, FOLLOW, FOLLOW_BEARING
     }
 
-    private final SafePaint mPaint = new SafePaint();
-    private final SafePaint mCirclePaint = new SafePaint();
+    private final Paint mPaint = new Paint();
+    private final Paint mCirclePaint = new Paint();
     protected final MapView mMapView;
     protected final Context mContext;
 
@@ -153,7 +153,7 @@ public class UserLocationOverlay extends SafeDrawOverlay implements Snappable, M
         mMyLocationProvider = myLocationProvider;
     }
 
-    protected void drawMyLocation(final ISafeCanvas canvas, final MapView mapView, final Location lastFix) {
+    protected void drawMyLocation(final Canvas canvas, final MapView mapView, final Location lastFix) {
 
         final Rect mapBounds = new Rect(0, 0, mapView.getMeasuredWidth(), mapView.getMeasuredHeight());
         final Projection projection = mapView.getProjection();
@@ -167,58 +167,69 @@ public class UserLocationOverlay extends SafeDrawOverlay implements Snappable, M
         final float mapScale = 1 / mapView.getScale();
 
         canvas.save();
+        try {
+            canvas.scale(mapScale, mapScale, mMapCoords.x, mMapCoords.y);
 
-        canvas.scale(mapScale, mapScale, mMapCoords.x, mMapCoords.y);
+            if (mDrawAccuracyEnabled) {
+                final float radius = lastFix.getAccuracy() / (float) Projection.groundResolution(
+                        lastFix.getLatitude(), mapView.getZoomLevel()) * mapView.getScale();
+                canvas.save();
+                try {
+                    // Rotate the icon
+                    canvas.rotate(lastFix.getBearing(), mMapCoords.x, mMapCoords.y);
+                    // Counteract any scaling that may be happening so the icon stays the same size
 
-        if (mDrawAccuracyEnabled) {
-            final float radius = lastFix.getAccuracy() / (float) Projection.groundResolution(
-                    lastFix.getLatitude(), mapView.getZoomLevel()) * mapView.getScale();
-            canvas.save();
-            // Rotate the icon
-            canvas.rotate(lastFix.getBearing(), mMapCoords.x, mMapCoords.y);
-            // Counteract any scaling that may be happening so the icon stays the same size
+                    mCirclePaint.setAlpha(50);
+                    mCirclePaint.setStyle(Style.FILL);
+                    canvas.drawCircle(mMapCoords.x, mMapCoords.y, radius, mCirclePaint);
 
-            mCirclePaint.setAlpha(50);
-            mCirclePaint.setStyle(Style.FILL);
-            canvas.drawCircle(mMapCoords.x, mMapCoords.y, radius, mCirclePaint);
+                    mCirclePaint.setAlpha(150);
+                    mCirclePaint.setStyle(Style.STROKE);
+                    canvas.drawCircle(mMapCoords.x, mMapCoords.y, radius, mCirclePaint);
+                } finally {
+                    canvas.restore();
+                }
+            }
 
-            mCirclePaint.setAlpha(150);
-            mCirclePaint.setStyle(Style.STROKE);
-            canvas.drawCircle(mMapCoords.x, mMapCoords.y, radius, mCirclePaint);
+            if (UtilConstants.DEBUGMODE) {
+                final float tx = (mMapCoords.x + 50);
+                final float ty = (mMapCoords.y - 20);
+                canvas.drawText("Lat: " + lastFix.getLatitude(), tx, ty + 5, mPaint);
+                canvas.drawText("Lon: " + lastFix.getLongitude(), tx, ty + 20, mPaint);
+                canvas.drawText("Alt: " + lastFix.getAltitude(), tx, ty + 35, mPaint);
+                canvas.drawText("Acc: " + lastFix.getAccuracy(), tx, ty + 50, mPaint);
+            }
+
+            if (lastFix.hasBearing()) {
+                canvas.save();
+                try {
+                    // Rotate the icon
+                    canvas.rotate(lastFix.getBearing(), mMapCoords.x, mMapCoords.y);
+                    // Draw the bitmap
+                    canvas.translate(-mDirectionArrowBitmap.getWidth() * mDirectionHotspot.x,
+                            -mDirectionArrowBitmap.getHeight() * mDirectionHotspot.y);
+
+                    canvas.drawBitmap(mDirectionArrowBitmap, mMapCoords.x, mMapCoords.y, mPaint);
+                } finally {
+                    canvas.restore();
+                }
+            } else {
+                canvas.save();
+                try {
+                    // Unrotate the icon if the maps are rotated so the little man stays upright
+                    canvas.rotate(-mMapView.getMapOrientation(), mMapCoords.x, mMapCoords.y);
+                    // Counteract any scaling that may be happening so the icon stays the same size
+                    canvas.translate(-mPersonBitmap.getWidth() * mPersonHotspot.x,
+                            -mPersonBitmap.getHeight() * mPersonHotspot.y);
+                    // Draw the bitmap
+                    canvas.drawBitmap(mPersonBitmap, mMapCoords.x, mMapCoords.y, mPaint);
+                } finally {
+                    canvas.restore();
+                }
+            }
+        } finally {
             canvas.restore();
         }
-
-        if (UtilConstants.DEBUGMODE) {
-            final float tx = (mMapCoords.x + 50);
-            final float ty = (mMapCoords.y - 20);
-            canvas.drawText("Lat: " + lastFix.getLatitude(), tx, ty + 5, mPaint);
-            canvas.drawText("Lon: " + lastFix.getLongitude(), tx, ty + 20, mPaint);
-            canvas.drawText("Alt: " + lastFix.getAltitude(), tx, ty + 35, mPaint);
-            canvas.drawText("Acc: " + lastFix.getAccuracy(), tx, ty + 50, mPaint);
-        }
-
-        if (lastFix.hasBearing()) {
-            canvas.save();
-            // Rotate the icon
-            canvas.rotate(lastFix.getBearing(), mMapCoords.x, mMapCoords.y);
-            // Draw the bitmap
-            canvas.translate(-mDirectionArrowBitmap.getWidth() * mDirectionHotspot.x,
-                    -mDirectionArrowBitmap.getHeight() * mDirectionHotspot.y);
-
-            canvas.drawBitmap(mDirectionArrowBitmap, mMapCoords.x, mMapCoords.y, mPaint);
-            canvas.restore();
-        } else {
-            canvas.save();
-            // Unrotate the icon if the maps are rotated so the little man stays upright
-            canvas.rotate(-mMapView.getMapOrientation(), mMapCoords.x, mMapCoords.y);
-            // Counteract any scaling that may be happening so the icon stays the same size
-            canvas.translate(-mPersonBitmap.getWidth() * mPersonHotspot.x,
-                    -mPersonBitmap.getHeight() * mPersonHotspot.y);
-            // Draw the bitmap
-            canvas.drawBitmap(mPersonBitmap, mMapCoords.x, mMapCoords.y, mPaint);
-            canvas.restore();
-        }
-        canvas.restore();
     }
 
     public PointF getPositionOnScreen(final Projection projection, PointF reuse) {
@@ -284,7 +295,7 @@ public class UserLocationOverlay extends SafeDrawOverlay implements Snappable, M
     }
 
     @Override
-    protected void drawSafe(ISafeCanvas canvas, MapView mapView, boolean shadow) {
+    protected void draw(Canvas canvas, MapView mapView, boolean shadow) {
         if (shadow) {
             return;
         }

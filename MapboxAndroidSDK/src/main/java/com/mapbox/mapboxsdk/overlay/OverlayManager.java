@@ -18,7 +18,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class OverlayManager extends AbstractList<Overlay> {
 
     private TilesOverlay mTilesOverlay;
-    private boolean mUseSafeCanvas = true;
 
     private final CopyOnWriteArrayList<Overlay> mOverlayList;
 
@@ -41,9 +40,6 @@ public class OverlayManager extends AbstractList<Overlay> {
     public void add(final int pIndex, final Overlay pElement) {
         try {
             mOverlayList.add(pIndex, pElement);
-            if (pElement instanceof SafeDrawOverlay) {
-                ((SafeDrawOverlay) pElement).setUseSafeCanvas(this.isUsingSafeCanvas());
-            }
         } finally {
             sortOverlays();
         }
@@ -62,9 +58,6 @@ public class OverlayManager extends AbstractList<Overlay> {
     public Overlay set(final int pIndex, final Overlay pElement) {
         try {
             Overlay overlay = mOverlayList.set(pIndex, pElement);
-            if (pElement instanceof SafeDrawOverlay) {
-                ((SafeDrawOverlay) pElement).setUseSafeCanvas(this.isUsingSafeCanvas());
-            }
             return overlay;
         } finally {
             sortOverlays();
@@ -72,11 +65,9 @@ public class OverlayManager extends AbstractList<Overlay> {
     }
 
     private Integer getOverlayClassSortIndex(Overlay overlay) {
-        int result = 3;
+        int result = 2;
         if (overlay instanceof MapEventsOverlay) {
             result = 0;
-        } else if (overlay instanceof UserLocationOverlay) {
-            result = 2;
         } else if (overlay instanceof PathOverlay) {
             result = 1;
         }
@@ -93,22 +84,6 @@ public class OverlayManager extends AbstractList<Overlay> {
         });
         mOverlayList.clear();
         mOverlayList.addAll(Arrays.asList(array));
-    }
-
-    public boolean isUsingSafeCanvas() {
-        return mUseSafeCanvas;
-    }
-
-    public void setUseSafeCanvas(boolean useSafeCanvas) {
-        mUseSafeCanvas = useSafeCanvas;
-        for (Overlay overlay : mOverlayList) {
-            if (overlay instanceof SafeDrawOverlay) {
-                ((SafeDrawOverlay) overlay).setUseSafeCanvas(this.isUsingSafeCanvas());
-            }
-        }
-        if (mTilesOverlay != null) {
-            mTilesOverlay.setUseSafeCanvas(this.isUsingSafeCanvas());
-        }
     }
 
     /**
@@ -129,9 +104,6 @@ public class OverlayManager extends AbstractList<Overlay> {
      */
     public void setTilesOverlay(final TilesOverlay tilesOverlay) {
         mTilesOverlay = tilesOverlay;
-        if (mTilesOverlay != null) {
-            mTilesOverlay.setUseSafeCanvas(this.isUsingSafeCanvas());
-        }
     }
 
     public Iterable<Overlay> overlaysReversed() {

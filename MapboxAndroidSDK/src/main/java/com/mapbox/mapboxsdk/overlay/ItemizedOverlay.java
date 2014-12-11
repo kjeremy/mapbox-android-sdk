@@ -10,9 +10,6 @@ import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 
 import com.mapbox.mapboxsdk.views.MapView;
-import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
-import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas.UnsafeCanvasHandler;
-import com.mapbox.mapboxsdk.views.safecanvas.SafePaint;
 import com.mapbox.mapboxsdk.views.util.Projection;
 
 import java.util.ArrayList;
@@ -27,7 +24,7 @@ import java.util.ArrayList;
  * @author Theodore Hong
  * @author Fred Eisele
  */
-public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay.Snappable {
+public abstract class ItemizedOverlay extends Overlay implements Overlay.Snappable {
 
     private final ArrayList<Marker> mInternalItemList;
     protected boolean mDrawFocusedItem = true;
@@ -35,7 +32,7 @@ public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay
     private boolean mPendingFocusChangedEvent = false;
     private OnFocusChangeListener mOnFocusChangeListener;
 
-    private static SafePaint mClusterTextPaint;
+    private static Paint mClusterTextPaint;
 
     /**
      * Method by which subclasses create the actual Items. This will only be called from populate()
@@ -53,7 +50,7 @@ public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay
         super();
 
         if (mClusterTextPaint == null) {
-            mClusterTextPaint = new SafePaint();
+            mClusterTextPaint = new Paint();
 
             mClusterTextPaint.setTextAlign(Paint.Align.CENTER);
             mClusterTextPaint.setTextSize(30);
@@ -87,7 +84,7 @@ public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay
      * @param shadow if true, draw the shadow layer. If false, draw the overlay contents.
      */
     @Override
-    protected void drawSafe(ISafeCanvas canvas, MapView mapView, boolean shadow) {
+    protected void draw(Canvas canvas, MapView mapView, boolean shadow) {
 
         if (shadow) {
             return;
@@ -151,7 +148,7 @@ public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay
      * @param canvas what the item is drawn upon
      * @param item the item to be drawn
      */
-    protected void onDrawItem(ISafeCanvas canvas, final Marker item, final Projection projection,
+    protected void onDrawItem(Canvas canvas, final Marker item, final Projection projection,
             final float aMapOrientation, final RectF mapBounds, final float mapScale) {
 
         item.updateDrawingPosition();
@@ -163,30 +160,21 @@ public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay
         }
 
         canvas.save();
+        try {
+            canvas.scale(mapScale, mapScale, position.x, position.y);
+            final int state =
+                    (mDrawFocusedItem && (mFocusedItem == item) ? Marker.ITEM_STATE_FOCUSED_MASK : 0);
+            final Drawable marker = item.getMarker(state);
+            if (marker == null) {
+                return;
+            }
+            final Point point = item.getAnchor();
 
-        canvas.scale(mapScale, mapScale, position.x, position.y);
-        final int state =
-                (mDrawFocusedItem && (mFocusedItem == item) ? Marker.ITEM_STATE_FOCUSED_MASK : 0);
-        final Drawable marker = item.getMarker(state);
-        if (marker == null) {
-            return;
+            // draw it
+            Overlay.drawAt(canvas, marker, roundedCoords, point, false, aMapOrientation);
+        } finally {
+            canvas.restore();
         }
-        final Point point = item.getAnchor();
-
-        // draw it
-        if (this.isUsingSafeCanvas()) {
-            Overlay.drawAt(canvas.getSafeCanvas(), marker, roundedCoords, point, false,
-                    aMapOrientation);
-        } else {
-            canvas.getUnsafeCanvas(new UnsafeCanvasHandler() {
-                @Override
-                public void onUnsafeCanvas(Canvas canvas) {
-                    Overlay.drawAt(canvas, marker, roundedCoords, point, false, aMapOrientation);
-                }
-            });
-        }
-
-        canvas.restore();
     }
 
     protected boolean markerHitTest(final Marker pMarker, final Projection pProjection,
