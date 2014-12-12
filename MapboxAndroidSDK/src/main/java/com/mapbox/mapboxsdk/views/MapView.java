@@ -145,7 +145,7 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
     protected List<MapListener> mListeners = new ArrayList<MapListener>();
 
     private float mapOrientation = 0;
-    private final float[] mRotatePoints = new float[2];
+    final PointF mRotateScalePoint = new PointF();
     private final Rect mInvalidateRect = new Rect();
 
     protected BoundingBox mScrollableAreaBoundingBox = null;
@@ -622,22 +622,14 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
      * @return centerpoint
      */
     public LatLng getCenter() {
-        final int worldSize_current_2 = Projection.mapSize(mZoomLevel) >> 1;
-        return Projection.pixelXYToLatLong((float) mDScroll.x
-                        + worldSize_current_2, (float) mDScroll.y + worldSize_current_2,
-                mZoomLevel
-        );
+        return (LatLng)getProjection().fromPixels(getWidth() / 2, getHeight() / 2);
     }
 
     public Rect getIntrinsicScreenRect(Rect reuse) {
         if (reuse == null) {
             reuse = new Rect();
         }
-        final int width_2 = getMeasuredWidth() >> 1;
-        final int height_2 = getMeasuredHeight() >> 1;
-        final int scrollX = getScrollX();
-        final int scrollY = getScrollY();
-        reuse.set(scrollX - width_2, scrollY - height_2, scrollX + width_2, scrollY + height_2);
+        reuse.set(0, 0, getWidth(), getHeight());
         return reuse;
     }
 
@@ -753,9 +745,9 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
         if (center != null) {
             // we cant use the mProjection because the values are not the right
             // one yet
-            final PointF centerPoint = Projection.toMapPixels(
-                    center.getLatitude(), center.getLongitude(), newZoomLevel,
-                    mDScroll.x, mDScroll.y, null);
+            final PointF centerPoint = getProjection().toPixels(
+                    center, newZoomLevel, null);/*,
+                    mDScroll.x, mDScroll.y, null);*/
             if (decale != null) {
                 centerPoint.offset(decale.x, decale.y);
             }
@@ -810,8 +802,14 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
      */
     private double minimumZoomForBoundingBox(final BoundingBox boundingBox,
                                              final boolean regionFit, final boolean roundedZoom) {
-        final RectF rect = Projection.toMapPixels(boundingBox,
-                TileLayerConstants.MAXIMUM_ZOOMLEVEL, mTempRect);
+        ILatLng northWest = new LatLng(boundingBox.getLatNorth(), boundingBox.getLonWest());
+        ILatLng southEast = new LatLng(boundingBox.getLatSouth(), boundingBox.getLonEast());
+
+        PointF topLeft = getProjection().toPixels(northWest, (float)TileLayerConstants.MAXIMUM_ZOOMLEVEL, null);
+        PointF bottomRight = getProjection().toPixels(southEast, (float)TileLayerConstants.MAXIMUM_ZOOMLEVEL, null);
+
+        final RectF rect = new RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
+
         final float requiredLatitudeZoom = TileLayerConstants.MAXIMUM_ZOOMLEVEL
                 - (float) ((Math.log(rect.height() / getMeasuredHeight()) / Math
                 .log(2)));
@@ -1151,8 +1149,16 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
         if (mScrollableAreaLimit == null) {
             mScrollableAreaLimit = new RectF();
         }
-        Projection.toMapPixels(mScrollableAreaBoundingBox, getZoomLevel(false),
-                mScrollableAreaLimit);
+        //getProjection().toPixels(mScrollableAreaBoundingBox, getZoomLevel(false), mScrollableAreaLimit);
+
+        ILatLng northWest = new LatLng(mScrollableAreaBoundingBox.getLatNorth(), mScrollableAreaBoundingBox.getLonWest());
+        ILatLng southEast = new LatLng(mScrollableAreaBoundingBox.getLatSouth(), mScrollableAreaBoundingBox.getLonEast());
+
+        PointF topLeft = getProjection().toPixels(northWest, (float)TileLayerConstants.MAXIMUM_ZOOMLEVEL, null);
+        PointF bottomRight = getProjection().toPixels(southEast, (float)TileLayerConstants.MAXIMUM_ZOOMLEVEL, null);
+
+        mScrollableAreaLimit = new RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
+
 //        if (mConstraintRegionFit) {
 //            int width = getMeasuredWidth();
 //            int height = getMeasuredHeight();
@@ -1237,38 +1243,30 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
 
     public void invalidateMapCoordinates(final Rect dirty) {
         mInvalidateRect.set(dirty);
-        final int width_2 = this.getWidth() / 2;
-        final int height_2 = this.getHeight() / 2;
+        mInvalidateRect.offset(getScrollX(), getScrollY());
 
-        // Since the canvas is shifted by getWidth/2, we can just return our natural scrollX/Y value
-        // since that is the same as the shifted center.
-        int centerX = this.getScrollX();
-        int centerY = this.getScrollY();
+        int centerX = this.getScrollX() + getWidth() / 2;
+        int centerY = this.getScrollY() + getHeight() / 2;
 
         if (this.getMapOrientation() != 0) {
             GeometryMath.getBoundingBoxForRotatedRectangle(mInvalidateRect, centerX, centerY,
                     this.getMapOrientation() + 180, mInvalidateRect);
         }
-        mInvalidateRect.offset(width_2, height_2);
 
         super.invalidate(mInvalidateRect);
     }
 
     public void invalidateMapCoordinates(final RectF dirty) {
         dirty.roundOut(mInvalidateRect);
-        final int width_2 = this.getWidth() / 2;
-        final int height_2 = this.getHeight() / 2;
+        mInvalidateRect.offset(getScrollX(), getScrollY());
 
-        // Since the canvas is shifted by getWidth/2, we can just return our natural scrollX/Y value
-        // since that is the same as the shifted center.
-        int centerX = this.getScrollX();
-        int centerY = this.getScrollY();
+        int centerX = this.getScrollX() + getWidth() / 2;
+        int centerY = this.getScrollY() + getHeight() / 2;
 
         if (this.getMapOrientation() != 0) {
             GeometryMath.getBoundingBoxForRotatedRectangle(mInvalidateRect, centerX, centerY,
                     this.getMapOrientation() + 180, mInvalidateRect);
         }
-        mInvalidateRect.offset(width_2, height_2);
 
         super.invalidate(mInvalidateRect);
     }
@@ -1321,7 +1319,7 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
                 final MapView.LayoutParams lp = (MapView.LayoutParams) child.getLayoutParams();
                 final int childHeight = child.getMeasuredHeight();
                 final int childWidth = child.getMeasuredWidth();
-                projection.toMapPixels(lp.geoPoint, mPoint);
+                projection.toPixels(lp.geoPoint, mPoint);
                 final int x = (int) mPoint.x + getWidth() / 2;
                 final int y = (int) mPoint.y + getHeight() / 2;
                 int childRight = x;
@@ -1418,7 +1416,7 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
                 final MapView.LayoutParams lp = (MapView.LayoutParams) child.getLayoutParams();
                 final int childHeight = child.getMeasuredHeight();
                 final int childWidth = child.getMeasuredWidth();
-                projection.toMapPixels(lp.geoPoint, mPoint);
+                projection.toPixels(lp.geoPoint, mPoint);
                 final int x = (int) mPoint.x + getWidth() / 2;
                 final int y = (int) mPoint.y + getHeight() / 2;
                 int childLeft = x;
@@ -1581,10 +1579,10 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
         }
         MotionEvent rotatedEvent = MotionEvent.obtain(ev);
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
-            mRotatePoints[0] = ev.getX();
-            mRotatePoints[1] = ev.getY();
-            getProjection().rotatePoints(mRotatePoints);
-            rotatedEvent.setLocation(mRotatePoints[0], mRotatePoints[1]);
+            getProjection().unrotateAndScalePoint((int) ev.getX(), (int) ev.getY(),
+                    mRotateScalePoint);
+            rotatedEvent.setLocation(mRotateScalePoint.x, mRotateScalePoint.y);
+
         } else {
             // This method is preferred since it will rotate historical touch events too
             try {
@@ -1593,7 +1591,7 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
                             new Class[]{Matrix.class});
                 }
                 sMotionEventTransformMethod.invoke(rotatedEvent,
-                        getProjection().getRotationMatrix());
+                        getProjection().getInvertedScaleRotateCanvasMatrix());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1720,7 +1718,6 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
         // Save the current canvas matrix
         c.save();
 
-        c.translate(getWidth() / 2, getHeight() / 2);
         c.scale(mMultiTouchScale, mMultiTouchScale, mMultiTouchScalePoint.x,
                 mMultiTouchScalePoint.y);
 
@@ -1741,24 +1738,6 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
      */
     private Projection updateProjection() {
         return new Projection(this);
-    }
-
-    /**
-     * Returns true if the safe drawing canvas is being used.
-     *
-     * @see {@link com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas}
-     */
-    public boolean isUsingSafeCanvas() {
-        return this.getOverlayManager().isUsingSafeCanvas();
-    }
-
-    /**
-     * Sets whether the safe drawing canvas is being used.
-     *
-     * @see {@link com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas}
-     */
-    public void setUseSafeCanvas(boolean useSafeCanvas) {
-        this.getOverlayManager().setUseSafeCanvas(useSafeCanvas);
     }
 
     /**
@@ -1867,7 +1846,7 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
                 final Projection projection = getProjection();
                 final float accuracyInPixels = pos.getAccuracy() / (float) projection.groundResolution(
                         pos.getLatitude());
-                final PointF point = projection.toMapPixels(pos.getLatitude(), pos.getLongitude(), null);
+                final PointF point = projection.toPixels(new LatLng(pos.getLatitude(), pos.getLongitude()));
                 return projection.getScreenRect().intersects((int) (point.x - accuracyInPixels),
                         (int) (point.y - accuracyInPixels),
                         (int) (point.x + accuracyInPixels),

@@ -5,10 +5,12 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.PointF;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 
+import com.mapbox.mapboxsdk.geometry.BoundingBox;
 import com.mapbox.mapboxsdk.views.MapView;
 import com.mapbox.mapboxsdk.views.util.Projection;
 
@@ -98,9 +100,13 @@ public abstract class ItemizedOverlay extends Overlay implements Overlay.Snappab
         final Projection pj = mapView.getProjection();
         final int size = this.mInternalItemList.size() - 1;
 
-        final RectF bounds =
-                new RectF(0, 0, mapView.getMeasuredWidth(), mapView.getMeasuredHeight());
-        pj.rotateRect(bounds);
+        BoundingBox boundingBox = pj.getBoundingBox();
+        PointF topLeft = pj.toProjectedPixels(boundingBox.getLatNorth(),
+                boundingBox.getLonWest(), null);
+        PointF bottomRight = pj.toProjectedPixels(boundingBox.getLatSouth(),
+                boundingBox.getLonEast(), null);
+        final RectF bounds = new RectF(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
+
         final float mapScale = 1 / mapView.getScale();
 
     /* Draw in backward cycle, so the items with the least index are on the front. */

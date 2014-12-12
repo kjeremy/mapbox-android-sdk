@@ -63,14 +63,13 @@ public class MapController implements MapViewConstants {
 
     protected void aboutToStartAnimation(final ILatLng latlong, final PointF mapCoords) {
         zoomOnLatLong = latlong;
-        final Projection projection = mMapView.getProjection();
         mMapView.mMultiTouchScalePoint.set(mapCoords.x, mapCoords.y);
-        projection.toPixels(mapCoords, mapCoords);
+        Projection.tileXYToPixelXY(mapCoords.x, mapCoords.y, mapCoords);
         zoomDeltaScroll.set((float) (mMapView.getMeasuredWidth() / 2.0 - mapCoords.x), (float) (mMapView.getMeasuredHeight() / 2.0 - mapCoords.y));
     }
 
     protected void aboutToStartAnimation(final ILatLng latlong) {
-        PointF mapCoords = mMapView.getProjection().toMapPixels(latlong, null);
+        PointF mapCoords = mMapView.getProjection().toPixels(latlong);
         aboutToStartAnimation(latlong, mapCoords);
     }
 
@@ -114,7 +113,7 @@ public class MapController implements MapViewConstants {
     public boolean goTo(final ILatLng point, PointF delta) {
 
         final Projection projection = mMapView.getProjection();
-        PointF p = projection.toMapPixels(point, null);
+        PointF p = projection.toPixels(point);
         if (delta != null) {
             p.offset(delta.x, delta.y);
         }
@@ -154,7 +153,8 @@ public class MapController implements MapViewConstants {
             mPointToGoTo = latlng;
             return;
         }
-        PointF p = mMapView.getProjection().toMapPixels(latlng, null);
+        PointF p = mMapView.getProjection().toPixels(latlng);
+        p.offset(-mMapView.getWidth() / 2, -mMapView.getHeight() / 2);
         if (decale != null) {
             p.offset(decale.x, decale.y);
         }
@@ -213,7 +213,8 @@ public class MapController implements MapViewConstants {
         float currentZoom = mMapView.getZoomLevel(false);
 
         final PointF dCurrentScroll = mMapView.getScrollPoint();
-        PointF p = Projection.toMapPixels(latlong.getLatitude(), latlong.getLongitude(), currentZoom, dCurrentScroll.x, dCurrentScroll.y, null);
+        //PointF p = Projection.toPixels(latlong, currentZoom, dCurrentScroll.x, dCurrentScroll.y);
+        PointF p = mMapView.getProjection().toPixels(latlong, currentZoom, null); //, dCurrentScroll.x, dCurrentScroll.y);
 
         float targetZoom = mMapView.getClampedZoomLevel(zoomlevel);
         boolean zoomAnimating = (targetZoom != currentZoom);
@@ -248,7 +249,7 @@ public class MapController implements MapViewConstants {
                     "scrollPoint", evaluator,
                     p));
         } else {
-            mMapView.getProjection().toPixels(p, p);
+            Projection.tileXYToPixelXY(p.x, p.y, p);
             zoomDeltaScroll.set((float) (mMapView.getMeasuredWidth() / 2.0 - p.x), (float) (mMapView.getMeasuredHeight() / 2.0 - p.y));
         }
 

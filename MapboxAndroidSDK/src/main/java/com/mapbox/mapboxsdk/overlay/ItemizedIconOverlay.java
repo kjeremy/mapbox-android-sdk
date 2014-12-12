@@ -225,11 +225,11 @@ public class ItemizedIconOverlay extends ItemizedOverlay {
     }
 
     private float screenX(Marker item) {
-        return view.getProjection().toMapPixels(item.getPoint(), null).x;
+        return view.getProjection().toPixels(item.getPoint(), null).x;
     }
 
     private float screenY(Marker item) {
-        return view.getProjection().toMapPixels(item.getPoint(), null).y;
+        return view.getProjection().toPixels(item.getPoint(), null).y;
     }
 
     public int getDrawnItemsLimit() {

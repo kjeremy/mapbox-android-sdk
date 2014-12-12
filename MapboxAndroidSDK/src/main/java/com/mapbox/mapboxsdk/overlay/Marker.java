@@ -334,7 +334,7 @@ public class Marker {
      * Get the current position of the marker in pixels
      */
     public PointF getPositionOnScreen(final Projection projection, final PointF reuse) {
-        return projection.toPixels(mCurMapCoords, reuse);
+        return projection.toPixelsFromProjected(mCurMapCoords, reuse);
     }
 
     public PointF getDrawingPositionOnScreen(final Projection projection, PointF reuse) {
@@ -361,7 +361,7 @@ public class Marker {
         if (reuse == null) {
             reuse = new RectF();
         }
-        projection.toMapPixels(mLatLng, mCurMapCoords);
+        projection.toPixels(mLatLng, mCurMapCoords);
         final int w = getWidth();
         final int h = getHeight();
         final float x = mCurMapCoords.x - mAnchor.x * w;

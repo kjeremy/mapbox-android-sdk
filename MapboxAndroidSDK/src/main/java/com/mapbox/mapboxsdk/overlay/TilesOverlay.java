@@ -129,7 +129,7 @@ public class TilesOverlay extends Overlay {
         c.getClipBounds(mClipRect);
         float zoomDelta = (float) (Math.log(mapView.getScale()) / Math.log(2d));
         final float zoomLevel = pj.getZoomLevel();
-        mWorldSize_2 = pj.getHalfWorldSize();
+        mWorldSize_2 = Projection.mapSize(zoomLevel) / 2;
         GeometryMath.viewPortRectForTileDrawing(pj, mViewPort);
 
         int tileSize = Projection.getTileSize();

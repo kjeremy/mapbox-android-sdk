@@ -6,6 +6,9 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.Rect;
+import android.graphics.RectF;
+
+import com.mapbox.mapboxsdk.geometry.BoundingBox;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.views.MapView;
 import com.mapbox.mapboxsdk.views.util.Projection;
@@ -125,7 +128,7 @@ public class PathOverlay extends Overlay {
         // precompute new points to the intermediate projection.
         for (; this.mPointsPrecomputed < size; this.mPointsPrecomputed++) {
             final PointF pt = this.mPoints.get(this.mPointsPrecomputed);
-            pj.toMapPixelsProjected((double) pt.x, (double) pt.y, pt);
+            pj.toProjectedPixels((double) pt.x, (double) pt.y, pt);
         }
 
         PointF screenPoint0 = null; // points on screen
@@ -134,7 +137,12 @@ public class PathOverlay extends Overlay {
         PointF projectedPoint1;
 
         // clipping rectangle in the intermediate projection, to avoid performing projection.
-        final Rect clipBounds = pj.fromPixelsToProjected(pj.getScreenRect());
+        BoundingBox boundingBox = pj.getBoundingBox();
+        PointF topLeft = pj.toProjectedPixels(boundingBox.getLatNorth(),
+                boundingBox.getLonWest(), null);
+        PointF bottomRight = pj.toProjectedPixels(boundingBox.getLatSouth(),
+                boundingBox.getLonEast(), null);
+        final Rect clipBounds = new Rect((int)topLeft.x, (int)topLeft.y, (int)bottomRight.x, (int)bottomRight.y);
 
         mPath.rewind();
         boolean needsDrawing = !mOptimizePath;
@@ -161,11 +169,11 @@ public class PathOverlay extends Overlay {
             // the starting point may be not calculated, because previous segment was out of clip
             // bounds
             if (screenPoint0 == null) {
-                screenPoint0 = pj.toMapPixelsTranslated(projectedPoint0, this.mTempPoint1);
+                screenPoint0 = pj.toPixelsFromProjected(projectedPoint0, this.mTempPoint1);
                 mPath.moveTo(screenPoint0.x, screenPoint0.y);
             }
 
-            screenPoint1 = pj.toMapPixelsTranslated(projectedPoint1, this.mTempPoint2);
+            screenPoint1 = pj.toPixelsFromProjected(projectedPoint1, this.mTempPoint2);
 
             // skip this point, too close to previous point
             if (Math.abs(screenPoint1.x - screenPoint0.x) + Math.abs(

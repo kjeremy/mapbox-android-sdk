@@ -163,7 +163,7 @@ public class UserLocationOverlay extends Overlay implements Snappable, MapListen
             //dont draw item if offscreen
             return;
         }
-        projection.toMapPixels(mLatLng, mMapCoords);
+        projection.toPixels(mLatLng, mMapCoords);
         final float mapScale = 1 / mapView.getScale();
 
         canvas.save();
@@ -274,7 +274,7 @@ public class UserLocationOverlay extends Overlay implements Snappable, MapListen
     }
 
     protected RectF getMyLocationMapDrawingBounds(MapView mv, Location lastFix, RectF reuse) {
-        mv.getProjection().toMapPixels(mLatLng, mMapCoords);
+        mv.getProjection().toPixels(mLatLng, mMapCoords);
         reuse = getDrawingBounds(mMapCoords, lastFix, reuse);
         // Add in the accuracy circle if enabled
         if (mDrawAccuracyEnabled) {
